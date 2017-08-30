@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>Status: Aktiv&#xd;
+Repository: https://github.com/xima-media/webs-skd-relaunch2016-typo3-website&#xd;
+Branch: master&#xd;
+Buildauslösung: manuell &#xd;
+&#xd;
+Deployment auf Produktivsystem (Live) bei SKD</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>7</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@3.5.1">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>git@jenkins:xima-media/webs-skd-relaunch2016-typo3-website.git</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions/>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>npm install
+bower install --force --production
+grunt build
+grunt staging</command>
+    </hudson.tasks.Shell>
+    <org.jvnet.hudson.plugins.SSHBuilder plugin="ssh@2.5">
+      <siteName>xima-root@prod.skd.museum:22</siteName>
+      <command>backupname=`date +&quot;%H-%M_%Y-%m-%d&quot;`
+
+mkdir /home/xima-root/backups/${backupname} &amp;&amp; cp -a /var/www/html/htdocs/shared /home/xima-root/backups/${backupname}/
+
+mysqldump --add-drop-database --opt --lock-all-tables -uroot -p/master_ -h localhost -P 3306 typo3_skd | gzip &gt; /home/xima-root/backups/${backupname}/typo3_skd.sql.gz
+
+cd /home/xima-root/backups/ &amp;&amp; ls -t | tail -n -1 | xargs rm -rf
+</command>
+      <execEachLine>false</execEachLine>
+    </org.jvnet.hudson.plugins.SSHBuilder>
+    <hudson.tasks.Shell>
+      <command>rsync --delete -aze ssh --iconv=UTF-8 $WORKSPACE/build.xml xima-root@192.168.248.150:/var/www/html
+rsync --delete -aze ssh --iconv=UTF-8 $WORKSPACE/composer.phar xima-root@192.168.248.150:/var/www/html
+rsync --delete -aze ssh --iconv=UTF-8 $WORKSPACE/phing.phar xima-root@192.168.248.150:/var/www/html
+rsync --delete -aze ssh --iconv=UTF-8 $WORKSPACE/phing/build xima-root@192.168.248.150:/var/www/html/phing
+rsync --delete -aze ssh --iconv=UTF-8 $WORKSPACE/htdocs/typo3 xima-root@192.168.248.150:/var/www/html/htdocs
+rsync --exclude=parameters.properties -aze ssh --iconv=UTF-8 $WORKSPACE/phing/config xima-root@192.168.248.150:/var/www/html/phing</command>
+    </hudson.tasks.Shell>
+    <org.jvnet.hudson.plugins.SSHBuilder plugin="ssh@2.5">
+      <siteName>xima-root@prod.skd.museum:22</siteName>
+      <command>cd /var/www/html &amp;&amp; chmod u+x phing.phar &amp;&amp; php phing.phar ci:release &amp;&amp; sudo chown -R xima-root:www-data /var/www/html/htdocs/*
+sudo chmod -R g+w /var/www/html/htdocs/releases/current/web/typo3temp/
+chmod g+w /var/www/html/htdocs/releases/current/web/typo3conf/
+chmod -R g+w /var/www/html/htdocs/shared/fileadmin/
+chmod -R g+w /var/www/html/htdocs/shared/uploads/
+chmod -R g+w /var/www/html/htdocs/shared/typo3conf/LocalConfiguration.php
+chmod -R g+w /var/www/html/htdocs/shared/typo3conf/PackageStates.php</command>
+      <execEachLine>true</execEachLine>
+    </org.jvnet.hudson.plugins.SSHBuilder>
+  </builders>
+  <publishers>
+    <hudson.tasks.Mailer plugin="mailer@1.20">
+      <recipients>mha@xima.de sle@xima.de hka@xima.de wla@xima.de</recipients>
+      <dontNotifyEveryUnstableBuild>false</dontNotifyEveryUnstableBuild>
+      <sendToIndividuals>false</sendToIndividuals>
+    </hudson.tasks.Mailer>
+  </publishers>
+  <buildWrappers/>
+</project>
